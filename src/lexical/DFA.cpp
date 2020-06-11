@@ -1,345 +1,364 @@
 #include "header/DFA.h"
+#include "header/DFAMinimization.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <bits/stdc++.h>
-
 using namespace std;
-#define MAX_LEN 100
 
-DFA dfa;
+#define ROW_MAX_LEN 500
+#define COLOUMN_MAX_LEN 128
 
-char NFA_TranstionTable[MAX_LEN][MAX_LEN][MAX_LEN];
-char DFA_TranstionTable[MAX_LEN][MAX_LEN][MAX_LEN];
-char* intialState;
-char* finalState;
-int statesCount = 0;
-int symbolsCount = 0;
-int epsilonIndex;
-int intialStateIndex;
-int tempDFA_row = 0;
-int numberOfStatesTemp = 1;
-int numberOfStates = 0;
-
-
-vector<std::string> markedStates;
-vector<pair<char*, vector <std::string> > > closureStates;
+DFAMinimization mDFA;
 
 
 DFA::DFA() {
-	std::cout<<"DFA Constructor"<<std::endl;
+	// std::cout<<"DFA Constructor ..."<<std::endl;
 }
 
 DFA::~DFA() {
-	// TODO Auto-generated destructor stub
 }
 
-void DFA::readParameters(char* start ,char* final ,char table[][MAX_LEN][MAX_LEN]){
+void DFA::readParameters(string start ,string final ,vector< vector<string> > table,
+											vector<pair<string, string>> finals){
 	intialState = start;
 	finalState = final;
+	finalsTokens = finals;
 
-	std::cout<<"Table Size: "<<sizeof(table)<<std::endl;
-	std::cout<<"sizeof(table[0]) / sizeof(table[i][0]): "<<sizeof(table[0]) / sizeof(table[0][0])<<std::endl;
+	for (int i = 0; i < stoi(finalState) + 1; i++) {
+		vector<string> temp;
+		for (int j = 0; j < COLOUMN_MAX_LEN; j++) {
+			temp.push_back("0");
+		}
+		DFA_TranstionTable.push_back(temp);
+	}
 
-	for (int i = 0; i < MAX_LEN; i++){
-		for (int j = 0; j < MAX_LEN; j++){
-			strcpy(NFA_TranstionTable[i][j], table[i][j]);
+	for (int i = 0; i < stoi(finalState) + 1; i++) {
+		vector<string> temp;
+		for (int j = 0; j < COLOUMN_MAX_LEN; j++) {
+			temp.push_back("0");
+		}
+		NFA_TranstionTable.push_back(temp);
+	}
+
+
+
+	for (int i = 0; i < stoi(finalState) + 1; i++) {
+		vector<string> temp = table.at(i);
+		for (int j = 0; j < COLOUMN_MAX_LEN; j++){
+			NFA_TranstionTable.at(i).at(j) = temp.at(j);
+			/*if (NFA_TranstionTable.at(i).at(j) == "0"){
+				continue;
+			}*/
+			//// std::cout<<"NFA"<<"["<<i<<"]"<<"["<<j<<"]: "<<NFA_TranstionTable[i][j]<<std::endl;
+
 		}
 	}
 
-	for (int i = 1; i < sizeof(table[0]) / sizeof(table[0][0]); i++){
-		if (strcmp(table[i][0], "")){
-			statesCount++;
-		}
-	}
 
-	for (int i = 1; i < sizeof(table[i]) / sizeof(table[i][0]); i++){
-		if (!strcmp(table[0][i], "epsilon")){
-			continue;
-		}else if (strcmp(table[0][i], "")){
-			symbolsCount++;
-		}
-	}
-
-	std::cout<<"symbolsCount: "<<symbolsCount<<std::endl;
+	//NFA_TranstionTable.at(428).at(0) = "0"; ////
 
 
-	for (int i = 0; i < sizeof(table); i++){
-		if (!strcmp(table[i][0], intialState)){
-			std::cout<<"Table: "<<table[i][0]<<std::endl;
-			int intialStateIndex = i;
-			std::cout<<"intialStateIndex: "<<i<<std::endl;
-		}
-	}
+	//// std::cout<<"NFA_TranstionTable[433][33]: "<<NFA_TranstionTable.at(433).at(33)<<std::endl;
+	//// std::cout<<"NFA_TranstionTable[12][100]: "<<NFA_TranstionTable.at(1).at(100)<<std::endl;
 
-	for (int i = 0; i < sizeof(table[0]); i++){
-		if (!strcmp(table[0][i], "epsilon")){
-			epsilonIndex = i;
-			std::cout<<"epsilonIndex: "<<i<<std::endl;
-		}
-	}
-
-	strcpy(DFA_TranstionTable[0][0], "States");
-	for (int j = 1; j < symbolsCount+1; j++){
-		if (!strcmp(table[0][j], "epsilon")){
-			continue;
-		} else{
-			strcpy(DFA_TranstionTable[0][j], table[0][j]);
-			//std::cout<<"DFA_TranstionTable[i][j]: "<<DFA_TranstionTable[0][j]<<std::endl;
-		}
-	}
-
-	std::cout<<"NFA_TranstionTable[4][2] "<<NFA_TranstionTable[4][2]<<std::endl;
-
-
-
-	std::cout<<"statesCount: "<<statesCount<<std::endl;
+	stringstream conv(finalState);
+	conv >> statesCount;
+	// std::cout<<"statesCount: "<<statesCount<<std::endl;
 
 }
 
 void DFA::convert(){
+	// std::cout<<"** Convert **"<<std::endl;
 
-	for (int i = 0; i < statesCount; i++){
-		epsilonClosure(i+1);
+	/* Get the Epsilon Closure for Each State */
+	for (int i = 1; i <= statesCount; i++){
+		epsilonClosure(i);
 	}
 
-	for (int i = 0; i < closureStates.size(); i++){
-		std::cout<<"state: "<<closureStates[i].first <<std::endl;
-		for (int j = 0; j < closureStates[i].second.size(); j++){
-			std::cout<<"Closure: "<<closureStates[i].second[j] <<" "<<std::endl;
-		}
+	// std::cout<<"intialState: "<<intialState<<std::endl;
 
+	std::string newIntial = "";
+	//vector<std::string> intialEpsilonClosure = dfa.firstEpsilonClosure(intialState);
+	vector<std::string> intialEpsilonClosure = closureStates[0].second;
+    sort(intialEpsilonClosure.begin(), intialEpsilonClosure.end());
+
+
+
+
+	for (int j = 0; j < intialEpsilonClosure.size(); j++){
+		newIntial = newIntial + intialEpsilonClosure[j] + ",";
 	}
+	string newIntialTemp = newIntial.substr(0, newIntial.size()-1);
 
 
+	intialState = newIntialTemp; //The New Intial State
 
-
-	vector<std::string> intialEpsilonClosure = dfa.firstEpsilonClosure(intialState);
-	dfa.transition(intialEpsilonClosure);
+	transition(intialEpsilonClosure);
 	numberOfStates++;
 
-	std::cout<<" "<<std::endl;
-	std::cout<<"**THE NEWSTATES**"<<std::endl;
-
+	// std::cout<<" "<<std::endl;
+	// std::cout<<"****** THE NEWSTATES ******"<<std::endl;
 	int tempRow = tempDFA_row;
-	while (numberOfStatesTemp > 0){
+	// std::cout<<"tempRow: "<<tempRow<<std::endl;
+	// std::cout<<"*>numberOfStatesTemp: "<<numberOfStatesTemp<<std::endl;
 
-		for (int i = 1; i < symbolsCount+1; i++){
-			std::cout<<"DFA: "<<DFA_TranstionTable[tempRow][i]<<std::endl;
+	while (numberOfStatesTemp > 0){
+		//// std::cout<<" "<<std::endl;
+		//// std::cout<<"tempRow: "<<tempRow<<std::endl;
+		//// std::cout<<"The State: "<<markedStates[tempRow-1]<<std::endl;
+		//// std::cout<<" "<<std::endl;
+
+
+		if (markedStates[tempRow-1].empty()){
+			//// std::cout<<"Break"<<std::endl;
+			tempRow--;
+			break;
+		}
+
+		for (int i = 1; i < 128; i++){
+			if (DFA_TranstionTable.at(tempRow).at(i) == "0"){
+				continue;
+			}
+			//// std::cout<<"tempState: "<<DFA_TranstionTable[tempRow][i]<<std::endl;
 
 			std::string tempState = DFA_TranstionTable[tempRow][i];
-			std::cout<<"tempState: "<<tempState<<std::endl;
 
-			for (int g = 0; g < markedStates.size(); g++){
-				std::cout << "markedStates "<<markedStates[g]<<std::endl;
-			}
-
-			if (!(std::count(markedStates.begin(), markedStates.end(), tempState))){
-				std::cout << "Element Not Found"<<std::endl;
+			if (!(std::find(markedStates.begin(), markedStates.end(), tempState) != markedStates.end())){
+				//// std::cout << "Element Not Found(Convert Function)"<<std::endl;
 				numberOfStates++;
-				char* tempStateChar = const_cast<char*>(tempState.c_str());
-
-				vector<std::string> tempStateArr;
-
-				for(int j = 0; j < strlen(tempStateChar); j++){
-					std::string s(1, tempStateChar[j]);
-					char* charNextState = const_cast<char*>(s.c_str());
-					std::string x = charNextState;
-
-					tempStateArr.push_back(x);
-				}
-				dfa.transition(tempStateArr);
+				vector <std::string> tempStateArray = conv_string_to_vector(tempState, ',');
+				transition(tempStateArray);
+				numberOfStatesTemp--;
+				//// std::cout << "*>numberOfStatesTemp(Decrease): "<<numberOfStatesTemp<<std::endl;
+			} else {
+				//// std::cout << "Element Found(Convert Function)"<<std::endl;
+				numberOfStatesTemp--;
+				//// std::cout << "*>numberOfStatesTemp(Decrease): "<<numberOfStatesTemp<<std::endl;
 			}
+
 		}
 		tempRow++;
-		numberOfStatesTemp--;
+		//numberOfStatesTemp--;
+		//// std::cout << "*>numberOfStatesTemp(Decrease): "<<numberOfStatesTemp<<std::endl;
 	}
-	dfa.displayDFA_TransitionTAble();
+
+	//// std::cout << "*OUT OF WHILE LOOP*"<<std::endl;
+	//// std::cout << ">>tempRow: "<<tempRow<<std::endl;
+	//// std::cout << "No.Of States: "<<markedStates.size()<<std::endl;
+
+
+	//displayDFA_TransitionTAble();
+
+	for (int h = 0; h < markedStates.size(); h++){
+		for (int t = 0; t < finalsTokens.size(); t++){
+			if (isBelong(finalsTokens[t].first, markedStates[h])){
+				newfinalsTokens.push_back(make_pair(markedStates[h], finalsTokens[t].second));
+				break;
+			}
+		}
+	}
+
+	// std::cout<<" "<<std::endl;
+	// std::cout<<"*** THE MINIMIZATION ***"<<std::endl;
+	//// std::cout<<"intialState: "<<intialState<<std::endl;
+	//// std::cout<<"finalState: "<<finalState<<std::endl;
+	mDFA.minimize(intialState, finalState, DFA_TranstionTable, markedStates, newfinalsTokens);//Minimization Call
+	mDFATable = mDFA.getMinimizedDFATable();
+	finalStatesWIthTokens = mDFA.getFinalStatesWithToken();
+	intialStaaate = mDFA.getInitState();
+	mapFinalsWithTokens = mDFA.getMappedFinalStatesWithToken();
+
+
 
 }
 
 void DFA::epsilonClosure(int i){
-	std::cout<<" "<<std::endl;
-	std::cout<<"**epsilonClosure Function**"<<std::endl;
-	std::cout<<"CurrentState: "<<NFA_TranstionTable[i][0]<<std::endl;
+	//// std::cout<<" "<<std::endl;
+	//// std::cout<<"**epsilonClosure Function**"<<std::endl;
+	//// std::cout<<"CurrentState: "<<i<<std::endl;
 
-    stack <int> stack;
-    pair<char*, vector <std::string> > closure;
 
-    closure.first = NFA_TranstionTable[i][0];
-    closure.second.push_back(NFA_TranstionTable[i][0]);
+	/* Convert int to String */
+	ostringstream str1;
+    str1 << i;
+    string firstState = str1.str();
 
-	stack.push(i);
+    stack <std::string> stack;
+    pair<std::string, vector <std::string> > closure;
+
+    closure.first = firstState;
+    closure.second.push_back(firstState);
+
+	stack.push(firstState);
 
 	while(!stack.empty()){
-		int currentState = stack.top();
+		string currentState = stack.top();
 		stack.pop();
 
-		if(strcmp(NFA_TranstionTable[currentState][epsilonIndex], "-")){
-			char* nextState = NFA_TranstionTable[currentState][epsilonIndex];
+		stringstream convert(currentState);
+		int currentStateIndex;
+		convert >> currentStateIndex;
 
-			std::cout<<"strlen(nextState): "<<strlen(nextState)<<std::endl;
+		if(NFA_TranstionTable.at(currentStateIndex).at(0) != "0"){
+			std::string nextState = NFA_TranstionTable.at(currentStateIndex).at(0);
 
-			for (int t = 0; t < strlen(nextState); t++){
-				// Convert char to char*
-				std::string s(1, nextState[t]);
-				char* charNextState = const_cast<char*>(s.c_str());
+			vector <std::string> nextStates = conv_string_to_vector(nextState, ',');
 
-				std::string str = charNextState;
+			for (int t = 0; t < nextStates.size(); t++){
 
-			    closure.second.push_back(str);
+			    closure.second.push_back(nextStates[t]);
+				//// std::cout<<"charNextState: "<<nextStates[t]<<std::endl;
+				stack.push(nextStates[t]);
 
-				std::cout<<"charNextState: "<<nextState[t]<<std::endl;
-				//std::cout<<"NFA_TranstionTable Size: "<<sizeof(NFA_TranstionTable)/sizeof(NFA_TranstionTable[0])<<std::endl;
-
-				for (int j = 1; j < sizeof(NFA_TranstionTable)/sizeof(NFA_TranstionTable[0]); j++){
-
-					if (!strcmp(NFA_TranstionTable[j][0], charNextState)){
-						stack.push(j);
-						std::cout<<"Push In The Stack: "<<j<<std::endl;
-					}
-				}
 			}
 		}
 	}
-
+	remove(closure.second);
+	/*for (int i = 0; i < closure.second.size(); i++){
+		// std::cout<<"EpsilonClosure: "<<closure.second[i]<<std::endl;
+	}*/
 	closureStates.push_back(closure);
-}
-
-
-vector <std::string> DFA::firstEpsilonClosure(char* initState){
-	std::cout<<" "<<std::endl;
-	std::cout<<"**transition Function**"<<std::endl;
-	vector <std::string> intialClosure;
-
-	/* Get the Epsilon Closure of the intial State */
-	for (int i = 0; i < closureStates.size(); i++){
-		//std::cout<<"State: "<<closureStates[i].first<<std::endl;
-		if (! strcmp(closureStates[i].first, initState)){
-			intialClosure = closureStates[i].second;
-		}
-		for (int j = 0; j < closureStates[i].second.size(); j++){
-			//std::cout<<"TheirClosures: "<<closureStates[i].second[j]<<std::endl;
-		}
-	}
-
-	return intialClosure;
 }
 
 void DFA::transition(vector <std::string> set){
 
-	std::cout<<" "<<std::endl;
-	std::cout<<"Transition Function: "<<std::endl;
+	//// std::cout<<" "<<std::endl;
+	//// std::cout<<"Transition Function: "<<std::endl;
 	/* Get the Transitions of each state in the Set */
-	std::string tempS;
+	sort(set.begin(), set.end());
+	/*for (int i = 0; i < set.size(); i++){
+		// std::cout<<"set After Sortng: "<<set[i]<<std::endl;
+	}*/
+	std::string tempS = "";
+
+	int f1 = 0;
+	string st;
 	for (int n = 0; n < set.size(); n++){
-		tempS = tempS + set[n];
+		f1 = 1;
+		tempS = tempS + set[n] + ",";
 	}
-	markedStates.push_back(tempS);
+	if (f1 == 1){
+		st = tempS.substr(0, tempS.size()-1);
+	}
+
+	//// std::cout<<">>"<<"Pushed in The MarkedStates: "<<st <<std::endl;
+	markedStates.push_back(st);
 
 	tempDFA_row++;
-	for (int i = 1; i < symbolsCount+1; i++){
-		std::cout<<"NewSymbol: "<<DFA_TranstionTable[0][i]<<"<<"<<std::endl;
+	for (int i = 1; i < 128; i++){
 		vector <std::string> resultWithoutClosure;
-		std::string tempState;
-		for (int j = 0; j < set.size(); j++){
-			tempState = tempState + set[j];
 
-			char* tempSymbol =	const_cast<char*>(set[j].c_str());
-			std::cout<<"tempSymbol: "<<tempSymbol<<std::endl;
+		sort(set.begin(), set.end());
+
+		for (int j = 0; j < set.size(); j++){
+
+			string tempStat = set[j];
+
+			stringstream convert(set[j]);
 			int tempSymbolIndex;
-			for (int t = 1; t < sizeof(NFA_TranstionTable)/sizeof(NFA_TranstionTable[0]); t++){
-				if (!strcmp(NFA_TranstionTable[t][0], tempSymbol)){
-					tempSymbolIndex = t;
-					std::cout<<"Symbol Index: "<<t<<std::endl;
-					break;
-				}
-			}
-			if (strcmp(NFA_TranstionTable[tempSymbolIndex][i], "-")){
-				resultWithoutClosure.push_back(NFA_TranstionTable[tempSymbolIndex][i]);
+			convert >> tempSymbolIndex;
+
+			if (NFA_TranstionTable.at(tempSymbolIndex).at(i) != "0"){
+				//// std::cout<<"TEMPSTATE: "<<tempStat<<std::endl;
+				//// std::cout<<"NewSymbol: "<<i<<" (Ascii)<<"<<std::endl;
+				//// std::cout<<"Value: "<<NFA_TranstionTable.at(tempSymbolIndex).at(i)<<std::endl;
+				resultWithoutClosure.push_back(NFA_TranstionTable.at(tempSymbolIndex).at(i));
 			} else {
-				std::cout<<"Corresponding Value= -"<<std::endl;
 				continue;
 			}
-		}
 
-		for (int f = 0; f < resultWithoutClosure.size(); f++){
-			std::cout<<"resultWithoutClosure: "<<resultWithoutClosure[f]<<std::endl;
-			std::cout<<" "<<std::endl;
-		}
+			if (resultWithoutClosure.size() == 0){
+				continue;
+			}
 
-		strcpy(DFA_TranstionTable[tempDFA_row][0], const_cast<char*>(tempState.c_str()));
-
-		std::string temp;
-		for (int f = 0; f < resultWithoutClosure.size(); f++){
-			std::cout<<"result: "<<resultWithoutClosure[f]<<std::endl;
-			temp = temp + resultWithoutClosure[f];
-		}
-		strcpy(DFA_TranstionTable[tempDFA_row][i], const_cast<char*>(temp.c_str()));
-
-		for (int h = 0; h < symbolsCount+1; h++){
-			std::cout<<"DFA: "<<DFA_TranstionTable[tempDFA_row][h]<<std::endl;
-		}
-
-		dfa.unionClosure(tempDFA_row, i);
-
-		for (int h = 0; h < symbolsCount+1; h++){
-			std::cout<<"DFA: "<<DFA_TranstionTable[tempDFA_row][h]<<std::endl;
-		}
+			sort(resultWithoutClosure.begin(), resultWithoutClosure.end());
+			std::string temp;
+			int f2 = 0;
+			string xy;
+			for (int n = 0; n < resultWithoutClosure.size(); n++){
+				f2 = 1;
+				temp = temp + resultWithoutClosure[n] + ",";
+			}
+			if (f2 == 1){
+				xy = temp.substr(0, temp.size()-1);
+			}
 
 
+			//// std::cout<<"resultWithoutClosure: "<<xy<<std::endl;
+			std::string null = "0";
+			if (xy == ""){
+				DFA_TranstionTable.at(tempDFA_row).at(i) = null;
+			} else {
+				DFA_TranstionTable.at(tempDFA_row).at(i) = xy;
+			}
 
-		std::string checkExist = DFA_TranstionTable[tempDFA_row][i];
-		if(!(std::count(markedStates.begin(), markedStates.end(), checkExist))){
-			std::cout << "Element Not Found"<<std::endl;
-			numberOfStatesTemp++;
+			/* Union Closure */
+			unionClosure(tempDFA_row, i);
+
+			std::string checkExist = DFA_TranstionTable[tempDFA_row][i];
+			//// std::cout << "checkExist: "<<checkExist<<std::endl;
+			if(!(std::find(markedStates.begin(), markedStates.end(), checkExist) != markedStates.end())){
+				//// std::cout << "Element Not Found"<<std::endl;
+				numberOfStatesTemp++;
+				//// std::cout << "*>numberOfStatesTemp(Increase): "<<numberOfStatesTemp<<std::endl;
+				//// std::cout << "*>numberOfStatesTemp: "<<numberOfStatesTemp<<std::endl;
+			} else {
+				//// std::cout << "Element Found"<<std::endl;
+			}
+			//// std::cout<<" "<<std::endl;
 		}
 	}
 
 }
 
 /*void DFA::getNewStates(){
-
 }*/
 
 void DFA::unionClosure(int tempRow, int tempColumn){
-	std::cout<<" "<<std::endl;
-	std::cout<<"**unionClosure Function**"<<std::endl;
-
+	//// std::cout<<" "<<std::endl;
+	//// std::cout<<"**unionClosure Function**"<<std::endl;
 
 	std::string currentTransition = DFA_TranstionTable[tempRow][tempColumn];
-	std::cout<<"currentTransition: "<<currentTransition<<std::endl;
+	//// std::cout<<"currentTransition: "<<currentTransition<<std::endl;
 
-	char* currentTransitionArr = const_cast<char*>(currentTransition.c_str());
+	//std::string unionTrans;
 
-	std::string unionTrans;
+	vector<std::string> currentTransitionArr = conv_string_to_vector(currentTransition, ',');
+	currentTransition += ",";
+	string currentTransitionTrim;
 
-	for (int j = 0; j < strlen(currentTransitionArr); j++){
-		std::string newTransition;
+	for (int i = 0; i < currentTransitionArr.size(); i++){
 
-		std::string s(1, currentTransitionArr[j]);
-		char* tempNewTransition = const_cast<char*>(s.c_str());
+		stringstream conv(currentTransitionArr[i]);
+		int currentTransitionIndex;
+		conv >> currentTransitionIndex;
+		vector <std::string> stateClosure = closureStates[currentTransitionIndex - 1].second;
 
-		newTransition = newTransition + currentTransitionArr[j];
-
-		for(int t = 0; t < closureStates.size();t++){
-			if(! strcmp(closureStates[t].first, tempNewTransition) ){
-				std::string stateClosure;
-				for(int u = 0; u < closureStates[t].second.size(); u++){
-					stateClosure = stateClosure + closureStates[t].second[u];
-				}
-				newTransition = newTransition + stateClosure;
-			}
+		int f = 0;
+		for (int j = 0; j < stateClosure.size(); j++){
+			f = 1;
+			currentTransition = currentTransition + stateClosure[j] + ",";
 		}
-		unionTrans = unionTrans + newTransition;
+		if (f == 1){
+			currentTransitionTrim = currentTransition.substr(0, currentTransition.size()-1);
+		}
 	}
-	std::cout<<"unionTrans: "<<unionTrans<<std::endl;
-	std::string finalUnionTransistion = removeDuplicate(unionTrans);
-	std::cout<<"finalUnionTransistion: "<<finalUnionTransistion<<std::endl;
-	sort(finalUnionTransistion.begin(), finalUnionTransistion.end());
-	std::cout<<"finalUnionTransistion: "<<finalUnionTransistion<<std::endl;
 
-	strcpy(DFA_TranstionTable[tempRow][tempColumn], const_cast<char*>(finalUnionTransistion.c_str()));
+	vector<std::string> unionArr = conv_string_to_vector(currentTransitionTrim, ',');
+	//// std::cout<<"currentTransition: "<<currentTransitionTrim<<std::endl;
+	remove(unionArr);
+	sort(unionArr.begin(), unionArr.end());
+	std::string str;
+
+	for (int i = 0; i < unionArr.size(); i++){
+		str = str + unionArr[i] + ",";
+	}
+	std::string strTrim = str.substr(0, str.size()-1);
+
+	//// std::cout<<"Result With Closure: "<<strTrim<<std::endl;
+	//// std::cout<<"*> Pushed in DFA_Table at Row: "<<tempRow<<std::endl;
+	DFA_TranstionTable.at(tempRow).at(tempColumn) = strTrim;
 
 }
 
@@ -368,17 +387,76 @@ std::string DFA::removeDuplicate(std::string str) {
 	 return str.substr(0, length);
 }
 
+vector<std::string> DFA::conv_string_to_vector(std::string s, char ch) {
+	vector<std::string> result;
+	string temp = "";
 
-
-void DFA::displayDFA_TransitionTAble(){
-	std::cout<<"**DFA TRANSITION TABLE**"<<std::endl;
-
-	for (int i = 0; i < numberOfStates+1; i++){
-		for (int j = 0; j < symbolsCount+1; j++){
-			std::cout<<"DFA"<<"["<<i<<"]"<<"["<<j<<"]: "<<DFA_TranstionTable[i][j]<<std::endl;
+	for (int i = 0; i < s.size(); i++){
+		if (ch == s[i] && !(temp.empty())){
+			result.push_back(temp);
+			temp = "";
+		} else {
+			temp += s[i];
 		}
 	}
+	result.push_back(temp);
+    return result;
+}
+
+int DFA::isBelong(string s1, string s2) {
+
+	vector<string> s2Arr = conv_string_to_vector(s2, ',');
+	for (int i = 0; i < s2Arr.size(); i++){
+		if (s2Arr[i] == s1){
+			return 1;
+		} else{
+			continue;
+		}
+	}
+	return 0;
+}
+
+void DFA::remove(std::vector<string> &v){
+	auto end = v.end();
+	for (auto it = v.begin(); it != end; ++it) {
+		end = std::remove(it + 1, end, *it);
+	}
+
+	v.erase(end, v.end());
+}
+
+void DFA::displayDFA_TransitionTAble() {
+	// std::cout<<"**DFA TRANSITION TABLE**"<<std::endl;
+
+	for (int i = 0; i < markedStates.size()+1; i++){
+		for (int j = 1; j < 128; j++){
+			std::string x = DFA_TranstionTable[i][j];
+			if (x == "0"){
+				continue;
+			} else {
+				// std::cout<<"DFA"<<"["<<i<<"]"<<"["<<j<<"]: "<<DFA_TranstionTable[i][j]<<std::endl;
+			}
+		}
+	}
+	/*// std::cout<<"**THE STATES**"<<std::endl;
+	for (int  i = 0; i < markedStates.size(); i++){
+		// std::cout<<markedStates[i]<<std::endl;
+	}*/
 }
 
 
+vector< vector<string> > DFA::getMinDFATable(){
+	return mDFATable;
+}
 
+vector< pair<string, vector<string> > > DFA::getFinalStatesWiithToken(){
+	return finalStatesWIthTokens;
+}
+
+string DFA::getinState(){
+	return intialStaaate;
+}
+
+vector<pair<string, string>> DFA::getMappedFinalWithTokens(){
+	return mapFinalsWithTokens;
+}
